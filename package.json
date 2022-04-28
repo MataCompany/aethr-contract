@@ -1,0 +1,25 @@
+{
+  "name": "aethr-contract",
+  "version": "1.0.0",
+  "description": "Smartcontract of project aethr",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MataCompany/aethr-contract.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MataCompany/aethr-contract/issues"
+  },
+  "homepage": "https://github.com/MataCompany/aethr-contract#readme",
+  "devDependencies": {
+    "hardhat": "^2.9.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.6.0"
+  }
+}
