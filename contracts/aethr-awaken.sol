@@ -80,7 +80,7 @@ contract AETHR_AWAKEN {
             );
             emit BurnNft(material[index], msg.sender);
         }
-        ATH.transferFrom(msg.sender, address(this), _feeAwaken);
+
         emit Awaken(main, material, msg.sender,star);
     }
 }

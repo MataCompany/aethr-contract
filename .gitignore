@@ -50,3 +50,6 @@ cache
 cache/solidity-files-cache.json
 package-lock.json
 yarn.lock
+
+.env
+build
