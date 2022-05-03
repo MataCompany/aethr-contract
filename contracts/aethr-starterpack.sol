@@ -30,19 +30,32 @@ contract AETHR_StarterPack is
 
     // EVENT
 
-    event BuyStarterPack(uint256 indexed tokenId, address addressWallet);
+    event BuyStarterPack(
+        packType _packType,
+        uint256 indexed tokenId,
+        address addressWallet
+    );
 
     event OpenPackSuccess(
+        packType _packType,
         uint256 packId,
         address addressWallet,
         address contractCreate
     );
 
+    enum packType {
+        NORMAL,
+        NEW
+    }
+    struct PackHistory {
+        bool isOpen;
+        packType packType;
+    } // 1 for normal pack, 2 for new pack
+
     // STATE
     mapping(address => bool) public approvalWhitelists;
     mapping(uint256 => bool) public lockedTokens;
-    mapping(uint256 => bool) public isOpen;
-
+    mapping(uint256 => PackHistory) public packInfo;
 
     string private _baseTokenURI;
 
@@ -51,8 +64,10 @@ contract AETHR_StarterPack is
     uint256 public totalStarterPack;
     uint256 public totalSoldStarterPack;
     uint256 public priceStarterPack;
+    uint256 public priceNewStarterPack;
 
     uint256 public totalItemInPack;
+    uint256 public totalItemInNewPack;
     uint256 public totalATHInPack;
 
     uint256 public percentStarterPack = 6000; // 60%
@@ -82,14 +97,22 @@ contract AETHR_StarterPack is
         _setupRole(MINTER_ROLE, _msgSender());
     }
 
-    modifier checkSaleStarterPackRequirements(address _msgSender) {
+    modifier checkSaleStarterPackRequirements(
+        address _msgSender,
+        packType _packType
+    ) {
+        uint256 price;
+        if (_packType == packType.NORMAL) price = priceStarterPack;
+        if (_packType == packType.NEW) price = priceNewStarterPack;
+        require(price > 0, "Can not calculate price");
+
         uint256 allowToPayAmount = BUSD.allowance(_msgSender, address(this));
         require(
-            allowToPayAmount >= priceStarterPack,
+            allowToPayAmount >= price,
             "Box Payment: Invalid token allowance"
         );
         require(
-            BUSD.balanceOf(_msgSender) >= priceStarterPack,
+            BUSD.balanceOf(_msgSender) >= price,
             "Box Payment: Invalid balanceOf"
         );
 
@@ -102,7 +125,7 @@ contract AETHR_StarterPack is
             ownerOf(tokenId) == _msgSender(),
             "Box Open : must have owner role to open"
         );
-        require(isOpen[tokenId] == false, "Box Open : box is opened");
+        require(packInfo[tokenId].isOpen == false, "Box Open : box is opened");
         require(!lockedTokens[tokenId], "Box Open : box is locked");
         require(
             FactoryNFT.hasRole(MINTER_ROLE, address(this)) == true,
@@ -111,34 +134,47 @@ contract AETHR_StarterPack is
         _;
     }
 
-    function buyStarterPack(address to)
+    function buyStarterPack(address to, packType _packType)
         public
         virtual
-        checkSaleStarterPackRequirements(_msgSender())
+        checkSaleStarterPackRequirements(_msgSender(), _packType)
     {
         _tokenIds.increment();
         uint256 newItemId = _tokenIds.current();
 
         require(!_exists(newItemId), "Pack Payment: must have unique tokenId");
 
-        BUSD.transferFrom(_msgSender(), address(Pool), priceStarterPack);
+        uint256 price;
+        if (_packType == packType.NORMAL) price = priceStarterPack;
+        if (_packType == packType.NEW) price = priceNewStarterPack;
+        BUSD.transferFrom(_msgSender(), address(Pool), price);
 
         _mint(to, newItemId);
-        isOpen[newItemId] = false;
-        emit BuyStarterPack(newItemId, _msgSender());
+        packInfo[newItemId] = PackHistory(false, _packType);
+        emit BuyStarterPack(_packType, newItemId, _msgSender());
     }
 
     function openStarterPack(uint256 boxId) public checkOpenPack(boxId) {
-        for (uint256 index = 0; index < totalItemInPack; index++) {
+        uint256 item;
+        if (packInfo[boxId].packType == packType.NORMAL) {
+            item = priceStarterPack;
+            uint256 totalPool = calculateFee(
+                priceStarterPack,
+                percentStarterPack
+            );
+            Pool.augmentPoolBUSD(_msgSender(), totalPool);
+            Pool.augmentPoolATH(_msgSender(), totalATHInPack);
+        }
+        if (packInfo[boxId].packType == packType.NEW)
+            item = priceNewStarterPack;
+        for (uint256 index = 0; index < item; index++) {
             FactoryNFT.mint(_msgSender());
         }
 
-        uint256 totalPool = calculateFee(priceStarterPack, percentStarterPack);
-        Pool.augmentPoolBUSD(_msgSender(), totalPool);
-        Pool.augmentPoolATH(_msgSender(), totalATHInPack);
-        isOpen[boxId] = true;
+        packInfo[boxId].isOpen = true;
 
         emit OpenPackSuccess(
+            packInfo[boxId].packType,
             boxId,
             _msgSender(),
             address(FactoryNFT)
@@ -147,6 +183,10 @@ contract AETHR_StarterPack is
 
     function setTotalItemInPack(uint256 _total) public onlyOwner {
         totalItemInPack = _total;
+    }
+
+    function setTotalItemInNewPack(uint256 _total) public onlyOwner {
+        totalItemInNewPack = _total;
     }
 
     function setTotalATHInPack(uint256 _total) public onlyOwner {
@@ -177,6 +217,10 @@ contract AETHR_StarterPack is
 
     function setPrice(uint256 price) public onlyOwner {
         priceStarterPack = price;
+    }
+
+    function setNewStarterPackPrice(uint256 price) public onlyOwner {
+        priceNewStarterPack = price;
     }
 
     function setTotalPack(uint256 amount) public onlyOwner {
